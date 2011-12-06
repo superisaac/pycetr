@@ -1,19 +1,23 @@
 #!/usr/bin/env python
-
+import sys
 import re
 import math
 import fileinput
-from HTMLParser import HTMLParser
 from cStringIO import StringIO
+import HTMLParser
+import CustomHTMLParser
+
+# Hijack the HTMLParser
+sys.modules['HTMLParser'] = sys.modules['CustomHTMLParser']
 
 imgs = []
 AVG_RATE = 3.5
 
-class ContentParser(HTMLParser):
+class ContentParser(CustomHTMLParser.HTMLParser):
     ''' Extract data content from processed html document
     '''
     def __init__(self, *args, **kw):
-        HTMLParser.__init__(self, *args, **kw)
+        CustomHTMLParser.HTMLParser.__init__(self, *args, **kw)
         self.data_list = []
 
     def handle_data(self, data):
@@ -31,15 +35,17 @@ def prettify(html):
 
     for elem in soup.findAll('img'):
         idx = len(imgs)
-        imgs.append(elem['src'])
-        width = int(elem.get('width', 1))
-        height = int(elem.get('height', 1))
-        if width >= 100 and height >= 100:
-            prefix = 'image' * 20
-        else:
-            prefix = 'image'
-        text = '[%s %s]' % (prefix, idx)
-        elem.replaceWith(text)
+        imgsrc = elem.get('src', '')
+        if imgsrc:
+            imgs.append(imgsrc)
+            width = int(elem.get('width', 1))
+            height = int(elem.get('height', 1))
+            if width >= 100 and height >= 100:
+                prefix = 'image' * 20
+            else:
+                prefix = 'image'
+            text = '[%s %s]' % (prefix, idx)
+            elem.replaceWith(text)
 
     title = ''
     titleTag = soup.html.head.title
@@ -130,6 +136,7 @@ def test():
         else:
             charset = 'utf-8'            
     data = unicode(data, charset)
+    #data = data.encode('utf-8')
     for chunk in extract_content(data):
         print '*', chunk
 
