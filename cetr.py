@@ -6,126 +6,54 @@ import fileinput
 from HTMLParser import HTMLParser
 from cStringIO import StringIO
 
-class TAG:
-    def __init__(self, tag, attrs):
-        self.tag = tag
-        self.attrs = attrs
-        self.children = []
-        self.depth = 0
-
-    def __unicode__(self):
-        #p = ' ' * self.depth
-        p = ''
-        s = p + '<%s' % self.tag
-        s += ''.join(' %s="%s"' % (k, v) for k, v in self.attrs)
-        if self.children:
-            s += '>'
-            sub_tag = False
-            for c in self.children:
-                if isinstance(c, TAG):
-                    sub_tag = True
-                    c.depth = self.depth + 1
-                    s += u'\n%s' % unicode(c)
-                else:
-                    s += unicode(c)
-            if sub_tag:
-                s += p
-            s += ('</%s>\n' % self.tag)
-        else:
-            s += '/>'
-        return s
+imgs = []
+AVG_RATE = 3.5
 
 class ContentParser(HTMLParser):
     ''' Extract data content from processed html document
     '''
-    title = ''
     def __init__(self, *args, **kw):
         HTMLParser.__init__(self, *args, **kw)
         self.data_list = []
-    
+
     def handle_data(self, data):
+        data = data.strip()
         self.data_list.append(data)
 
-class TreeParser(HTMLParser):
-    ''' Build HTML document into a tree
-    '''
-    def __init__(self, *args, **kw):
-        HTMLParser.__init__(self, *args, **kw)
-        self.state = 'init'
-        # put root element
-        self.elem_stack = [TAG('root', [])]
+def prettify(html):
+    from BeautifulSoup import BeautifulSoup
+    soup = BeautifulSoup(html)
+    for scpt in soup.findAll('script'):
+        scpt.extract()
 
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        self.handle_endtag(tag)
+    for scpt in soup.findAll('style'):
+        scpt.extract()
 
-    def handle_starttag(self, tag, attrs):
-        tag = tag.lower()
-        if self.state == 'init':
-            if tag == 'script':
-                self.state = 'in_script'
-                return
-            elif tag == 'style':
-                self.state = 'in_style'
-                return
-            elif tag == 'title':
-                self.state = 'in_title'
-        self.elem_stack.append(TAG(tag, attrs))
+    for elem in soup.findAll('img'):
+        idx = len(imgs)
+        imgs.append(elem['src'])
+        width = int(elem.get('width', 1))
+        height = int(elem.get('height', 1))
+        if width >= 100 and height >= 100:
+            prefix = 'image' * 20
+        else:
+            prefix = 'image'
+        text = '[%s %s]' % (prefix, idx)
+        elem.replaceWith(text)
 
-    def handle_endtag(self, tag):
-        tag = tag.lower()
-        if self.state == 'in_script':
-            if tag == 'script':
-                self.state = 'init'
-            return
-        elif self.state == 'in_style':
-            if tag == 'style':
-                self.state = 'init'
-            return
-        elif self.state == 'in_title':
-            if tag == 'title':
-                self.state = 'init'
-            return
-        elif self.state == 'init':
-            self.collect_children(tag)
-
-    def collect_children(self, tag):
-        matched_element = None
-        idx = -1
-        for idx in range(len(self.elem_stack) -1, -1, -1):
-            if self.elem_stack[idx].tag == tag:
-                matched_element = self.elem_stack[idx]
-                break
-        if matched_element:
-            self.elem_stack, children = self.elem_stack[:idx + 1], self.elem_stack[idx + 1:]
-            matched_element.children.extend(children)
-
-    def handle_data(self, data):
-        if self.state == 'init':
-            if self.elem_stack:
-                self.elem_stack[-1].children.append(data.strip())
-        elif self.state == 'in_title':
-            self.title = data.strip()
-
-    def handle_charref(self, name):
-        pass
-
-    def handle_entityref(self, name):
-        pass
-
-    def handle_comment(self, data):
-        pass
+    title = ''
+    titleTag = soup.html.head.title
+    if titleTag:
+        title = titleTag.string
+    return title, soup.prettify()
 
 def get_tag_ratio_list(html):
     '''
     A list of smoothed tag ratios
       html - source data as unicode
     '''
-    p = TreeParser()
-    p.feed(html)
-    p.collect_children('root')
-    tag = p.elem_stack[-1]
-    lines = unicode(tag).split('\n')
+    title, html= prettify(html)
+    lines = html.split('\n')
     lines = [line for line in lines if not re.match(r'^\s*$', line)]
     
     tag_ratio_list = []
@@ -149,7 +77,7 @@ def get_tag_ratio_list(html):
              tag_ratio_list[idx + 2] * c2)
         v = v / (2 * c1 + 2 * c2 + 1)
         smoothed.append((v, lines[idx]))
-    return p.title, smoothed
+    return title, smoothed
 
 def extract_content(html, threshold=None):
     '''
@@ -159,7 +87,7 @@ def extract_content(html, threshold=None):
     '''
     title, tag_ratio_list = get_tag_ratio_list(html)
     if threshold is None:
-        threshold = 5.0 * sum(r[0] for r in tag_ratio_list) // len(tag_ratio_list)
+        threshold = AVG_RATE * sum(r[0] for r in tag_ratio_list) // len(tag_ratio_list)
 
     dp = ContentParser()
     for v, line in tag_ratio_list:
@@ -167,6 +95,13 @@ def extract_content(html, threshold=None):
             dp.feed(line)
     yield title
     for chunk in dp.data_list:
+        if not chunk:
+            continue
+        def onimage(m):
+            imgid = int(m.group(2))
+            src = imgs[imgid]
+            return '[img src="%s"]' % src
+        chunk = re.sub(r'\[(image)+ (\d+)\]', onimage, chunk)
         yield chunk
 
 def test():
@@ -196,7 +131,7 @@ def test():
             charset = 'utf-8'            
     data = unicode(data, charset)
     for chunk in extract_content(data):
-        print chunk
+        print '*', chunk
 
 if __name__ == '__main__':
     test()
