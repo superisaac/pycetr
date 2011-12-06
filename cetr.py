@@ -38,6 +38,7 @@ class TAG:
 class ContentParser(HTMLParser):
     ''' Extract data content from processed html document
     '''
+    title = ''
     def __init__(self, *args, **kw):
         HTMLParser.__init__(self, *args, **kw)
         self.data_list = []
@@ -67,6 +68,8 @@ class TreeParser(HTMLParser):
             elif tag == 'style':
                 self.state = 'in_style'
                 return
+            elif tag == 'title':
+                self.state = 'in_title'
         self.elem_stack.append(TAG(tag, attrs))
 
     def handle_endtag(self, tag):
@@ -77,6 +80,10 @@ class TreeParser(HTMLParser):
             return
         elif self.state == 'in_style':
             if tag == 'style':
+                self.state = 'init'
+            return
+        elif self.state == 'in_title':
+            if tag == 'title':
                 self.state = 'init'
             return
         elif self.state == 'init':
@@ -97,6 +104,8 @@ class TreeParser(HTMLParser):
         if self.state == 'init':
             if self.elem_stack:
                 self.elem_stack[-1].children.append(data.strip())
+        elif self.state == 'in_title':
+            self.title = data.strip()
 
     def handle_charref(self, name):
         pass
@@ -106,7 +115,6 @@ class TreeParser(HTMLParser):
 
     def handle_comment(self, data):
         pass
-
 
 def get_tag_ratio_list(html):
     '''
@@ -141,7 +149,7 @@ def get_tag_ratio_list(html):
              tag_ratio_list[idx + 2] * c2)
         v = v / (2 * c1 + 2 * c2 + 1)
         smoothed.append((v, lines[idx]))
-    return smoothed
+    return p.title, smoothed
 
 def extract_content(html, threshold=None):
     '''
@@ -149,7 +157,7 @@ def extract_content(html, threshold=None):
       html - source data as unicode
       threshold - the value above which a line is considered content
     '''
-    tag_ratio_list = get_tag_ratio_list(html)
+    title, tag_ratio_list = get_tag_ratio_list(html)
     if threshold is None:
         threshold = 5.0 * sum(r[0] for r in tag_ratio_list) // len(tag_ratio_list)
 
@@ -157,6 +165,7 @@ def extract_content(html, threshold=None):
     for v, line in tag_ratio_list:
         if v > threshold:
             dp.feed(line)
+    yield title
     for chunk in dp.data_list:
         yield chunk
 
