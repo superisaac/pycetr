@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-import sys
-import re
+import sys, re
 import math
-import fileinput
-from cStringIO import StringIO
 import HTMLParser
 import CustomHTMLParser
 
@@ -111,34 +108,13 @@ def extract_content(html, threshold=None):
         yield chunk
 
 def test():
-    '''
-    Get a url to 
-    '''
-    import sys
-    import urllib, urllib2
-    try:
-        url = sys.argv[1]
-        req = urllib2.Request(url)
-        resp = urllib2.urlopen(req, None, 10)
-    except:
-        print >>sys.stderr, 'Usage: %s <url>' % sys.argv[0]
-        raise
-    info = resp.info()
-    charset = info.getparam('charset')
-    ttype = info.gettype()
-    assert ttype.startswith('text/html')
-    data = resp.read()
-    if charset is None:
-        # Ad hoc way to find charset from http-equiv
-        m = re.search(r'charset=(?P<charset>[\w\-]+)', data)
-        if m:
-            charset = m.group('charset')
-        else:
-            charset = 'utf-8'            
-    data = unicode(data, charset)
-    #data = data.encode('utf-8')
+    import fileinput
+    charset = 'utf-8'
+    data = ''
+    for line in fileinput.input():
+        data += unicode(line, charset)
     for chunk in extract_content(data):
-        print '*', chunk
+        print chunk
 
 if __name__ == '__main__':
     test()

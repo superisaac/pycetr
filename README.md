@@ -37,5 +37,5 @@ INSTALL and RUN
 ```
 % cd pycetr
 % sudo python setup.py install
-% python -m cetr  'http://www.nytimes.com/2011/12/02/technology/eu-e-book-sales-hampered-by-tax-structure.html'
+% curl -s 'http://www.nytimes.com/2011/12/02/technology/eu-e-book-sales-hampered-by-tax-structure.html' | python -m cetr
 ```
