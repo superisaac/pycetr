@@ -9,6 +9,7 @@ import CustomHTMLParser
 sys.modules['HTMLParser'] = sys.modules['CustomHTMLParser']
 
 imgs = []
+flashes = []
 AVG_RATE = 3.5
 
 class ContentParser(CustomHTMLParser.HTMLParser):
@@ -25,12 +26,16 @@ class ContentParser(CustomHTMLParser.HTMLParser):
 def prettify(html):
     from BeautifulSoup import BeautifulSoup
     soup = BeautifulSoup(html)
+
+    # Remove script tags
     for scpt in soup.findAll('script'):
         scpt.extract()
-
+    
+    # Remove style tags
     for scpt in soup.findAll('style'):
         scpt.extract()
-
+        
+    # Handle images
     for elem in soup.findAll('img'):
         idx = len(imgs)
         imgsrc = elem.get('src', '')
@@ -43,13 +48,37 @@ def prettify(html):
                 width = 1
                 height = 1
             alt = elem.get('alt', '')
+            area = width * height
             if width >= 100 and height >= 100:
-                prefix = 'image' * 20
+                prefix = 'image' * int(area / 2000)
             else:
                 prefix = 'image'
             text = u'[%s %s "%s"]' % (prefix, idx, alt)
             elem.replaceWith(text)
-
+    
+    # Get Flash movies
+    for elem in soup.findAll('embed'): #[@type="application/x-shockwave-flash"]'):
+        if elem.get('type') != 'application/x-shockwave-flash':
+            continue
+        idx = len(flashes)
+        src = elem.get('src', '')
+        if src:
+            flashes.append(src)
+            try:
+                width = int(elem.get('width', 1))
+                height = int(elem.get('height', 1))
+            except ValueError:
+                width = 1
+                height = 1
+            
+            area = width * height / 2000
+            if width >= 100 and height >= 100:
+                prefix = 'flash' * int(area)
+            else:
+                prefix = 'flash'
+            text = u'[%s %s]' % (prefix, idx)
+            elem.replaceWith(text)
+    
     title = ''
     titleTag = soup.html.head.title
     if titleTag:
@@ -108,6 +137,7 @@ def get_content(content_lines):
     for chunk in dp.data_list:
         if not chunk:
             continue
+
         def onimage(m):
             imgid = int(m.group(2))
             src = imgs[imgid]
@@ -117,6 +147,13 @@ def get_content(content_lines):
         if not isinstance(chunk, unicode):
             chunk = unicode(chunk, 'utf-8')
         chunk = re.sub(ur'\[(image)+ (\d+) "(.*?)"\]', onimage, chunk)
+
+        def onflash(m):
+            flashid = int(m.group(2))
+            src = flashes[flashid]
+            return '[flash src="%s"]' % src
+
+        chunk = re.sub(ur'\[(flash)+ (\d+)\]', onflash, chunk)
         yield chunk
 
 class Point2D:
