@@ -30,7 +30,7 @@ tagfind = re.compile('[a-zA-Z][-.a-zA-Z0-9:_]*')
 
 attrfind = re.compile(
     r'\s*([a-zA-Z_][-.:a-zA-Z_0-9]*)(\s*='
-    r'(\'\s*[^\']*\'|\s*"[^"]*"|[^>\/\s]*))?')
+    r'(\'\s*[^\']*\'|\s*"[^"]*"|[^>\s]*))?')
 
 locatestarttagend = re.compile(r"""
   <[a-zA-Z][-.a-zA-Z0-9:_]*          # tag name
@@ -244,6 +244,7 @@ class HTMLParser(markupbase.ParserBase):
             if not m:
                 break
             attrname, rest, attrvalue = m.group(1, 2, 3)
+            attrvalue = attrvalue.lstrip()
             if not rest:
                 attrvalue = None
             elif attrvalue[:1] == '\'' == attrvalue[-1:] or \

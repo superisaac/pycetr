@@ -42,11 +42,12 @@ def prettify(html):
             except ValueError:
                 width = 1
                 height = 1
+            alt = elem.get('alt', '')
             if width >= 100 and height >= 100:
                 prefix = 'image' * 20
             else:
                 prefix = 'image'
-            text = '[%s %s]' % (prefix, idx)
+            text = u'[%s %s "%s"]' % (prefix, idx, alt)
             elem.replaceWith(text)
 
     title = ''
@@ -110,8 +111,12 @@ def get_content(content_lines):
         def onimage(m):
             imgid = int(m.group(2))
             src = imgs[imgid]
-            return '[img src="%s"]' % src
-        chunk = re.sub(r'\[(image)+ (\d+)\]', onimage, chunk)
+            alt = m.group(3)
+            return '[img src="%s" alt="%s"]' % (src, alt)
+
+        if not isinstance(chunk, unicode):
+            chunk = unicode(chunk, 'utf-8')
+        chunk = re.sub(ur'\[(image)+ (\d+) "(.*?)"\]', onimage, chunk)
         yield chunk
 
 class Point2D:
@@ -158,12 +163,14 @@ def boundbox(points):
             maxy = p.y
     return (minx, miny, maxx, maxy)
     
-def kmean_cluster(html, k=2):
+def kmean_cluster(html, k=5):
+    assert k >= 2
     title, tag_ratio_list = get_tag_ratio_list(html)
+    threshold = AVG_RATE * float(sum(r[0] for r in tag_ratio_list)) // len(tag_ratio_list)
     points = []
     ratio_list = [v for v, line in tag_ratio_list]
     for i in xrange(len(ratio_list) - 1):
-        nlist = ratio_list[i+1: i+6]
+        nlist = ratio_list[i+1: i+4]
         dv = sum(nlist)/len(nlist) - ratio_list[i]
         if dv < 0:
             dv = -dv
@@ -197,14 +204,12 @@ def kmean_cluster(html, k=2):
             if len(g):
                 kernel.set_pos(sumx / len(g),
                                sumy / len(g))
-    
-        #for kernel, g in zip(kernels, groups):
-        #    print kernel, len(g)
-        #print
 
     gps = []
-    for i, (k, g) in enumerate(zip(kernels, groups)):
-        if i == 0:
+    #print 'threshold', threshold
+    for i, (kernel, g) in enumerate(zip(kernels, groups)):
+        #print kernel, len(g)
+        if kernel.x < threshold:
             continue
         for p in g:
             gps.append((p.data, p))
