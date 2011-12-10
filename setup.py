@@ -5,7 +5,7 @@ kwargs = {}
 distutils.core.setup(
     name='cetr',
     version='0.1.0',
-    py_modules=['cetr', 'CustomHTMLParser'],
+    py_modules=['cetr', 'CustomHTMLParser', 'custom_markupbase'],
     author='superisaac',
     author_email='superisaac.ke@gmail.com',
     url='https://github.com/superisaac/pycetr',
