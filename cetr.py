@@ -126,14 +126,16 @@ def extract_content_by_threshold(html, threshold=None):
     title, tag_ratio_list = get_tag_ratio_list(html)
     if threshold is None:
         threshold = AVG_RATE * sum(r[0] for r in tag_ratio_list) // len(tag_ratio_list)
-
+    
     content_lines = [(v, line) for v, line in tag_ratio_list if v > gthreshold]
-    return get_content(content_lines)
+    return get_content(title, content_lines)
 
-def get_content(content_lines):
+def get_content(title, content_lines):
+    yield title
     dp = ContentParser()
     for v, line in content_lines:
         dp.feed(line)
+
     for chunk in dp.data_list:
         if not chunk:
             continue
@@ -254,7 +256,7 @@ def kmean_cluster(html, k=5):
     content_lines = []
     for i, p in gps:
         content_lines.append(tag_ratio_list[i])
-    return get_content(content_lines)    
+    return get_content(title, content_lines)
 
 #extract_content = extract_content_by_cluster
 extract_content = kmean_cluster
