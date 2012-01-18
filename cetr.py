@@ -167,9 +167,12 @@ class ContentExtractor(object):
                 elem.replaceWith(text)
     
         title = ''
-        titleTag = soup.html.head.title
-        if titleTag:
-            title = titleTag.string
+        try:
+            titleTag = soup.html.head.title
+            if titleTag:
+                title = titleTag.string
+        except ValueError:
+            pass
         return title.strip(), soup.prettify()
 
     def get_tag_ratio_list(self, html):
