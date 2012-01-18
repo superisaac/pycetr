@@ -24,8 +24,12 @@ class ContentParser(CustomHTMLParser.HTMLParser):
         self.data_list.append(data)
 
 def prettify(html):
-    from BeautifulSoup import BeautifulSoup
+    from BeautifulSoup import BeautifulSoup, Comment
     soup = BeautifulSoup(html)
+
+    # Remove comments
+    for cmt in soup.findAll(text=lambda text: isinstance(text, Comment)):
+        cmt.extract()
 
     # Remove script tags
     for scpt in soup.findAll('script'):
@@ -85,11 +89,49 @@ def prettify(html):
         title = titleTag.string
     return title, soup.prettify()
 
+def strip_comments(html):
+    ahead = ''
+    offset = 0
+    idx = html.find('<!--', offset)
+    while idx >= offset:
+        ahead += html[offset:idx]
+        end_cmt_idx = html.find('-->', idx + len('<!--'))
+        if end_cmt_idx >= idx + len('<!--'):
+            offset = end_cmt_idx + len('-->')
+        else:
+            offset = len(html)
+        idx = html.find('<!--', offset)
+    ahead += html[offset:]
+    return ahead
+
+def strip_tags(html, tag='script'):
+    ahead = ''
+    offset = 0
+    idx = html.find('<%s' % tag, offset)
+    while idx >= offset:
+        ahead += html[offset:idx]
+        end_tag_idx = html.find('>', idx + len('<%s' % tag))
+        if end_tag_idx >= idx + len('<%s' % tag):
+            if html[end_tag_idx - 1] == '/':
+                offset = end_tag_idx + 1
+            else:
+                end_tag_idx = html.find('</%s>' % tag, end_tag_idx + 1)
+                offset = end_tag_idx + len('</%s>' % tag)
+        else:
+            offset = len(html)
+        idx = html.find('<%s' % tag, offset)
+    ahead += html[offset:]
+    return ahead
+
 def get_tag_ratio_list(html):
     '''
     A list of smoothed tag ratios
       html - source data as unicode
     '''
+    html = strip_tags(html, tag='script')
+    html = strip_tags(html, tag='noscript')
+    html = strip_comments(html)
+
     title, html= prettify(html)
     lines = html.split('\n')
     lines = [line for line in lines if not re.match(r'^\s*$', line)]
