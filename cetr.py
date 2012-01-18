@@ -130,6 +130,7 @@ def get_tag_ratio_list(html):
     '''
     html = strip_tags(html, tag='script')
     html = strip_tags(html, tag='noscript')
+    html = strip_tags(html, tag='style')
     html = strip_comments(html)
 
     title, html= prettify(html)
